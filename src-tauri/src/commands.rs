@@ -5,7 +5,7 @@ use crate::config::WanipopConfig;
 use crate::wanikani::{self, ReviewResult, SubmittedReviewData};
 use serde::Serialize;
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 pub struct ReviewCard {
     pub assignment_id: u64,
     pub subject_id: u64,
@@ -147,13 +147,20 @@ pub async fn get_review_batch(state: State<'_, AppState>) -> Result<Vec<ReviewCa
         ids.truncate(batch_size);
     }
 
+    println!("Randomly chose these reviews to do:\n{:#?}", ids);
+
     // 4. fetch assignments & subjects in one go
     let assignments = wanikani::fetch_assignments_for_subjects(&client, api_key.clone(), &ids)
         .await
         .map_err(|e| format!("Assignments error: {}", e))?;
+
+    println!("Fetched assignments:\n{:#?}", assignments);
+
     let subjects = wanikani::fetch_subjects(&client, api_key.clone(), &ids)
         .await
         .map_err(|e| format!("Subjects error: {}", e))?;
+
+    println!("Fetched subjects:\n{:#?}", assignments);
 
     // 5. zip them into ReviewCard
     let cards = assignments
@@ -174,6 +181,8 @@ pub async fn get_review_batch(state: State<'_, AppState>) -> Result<Vec<ReviewCa
                 })
         })
         .collect();
+
+    println!("Cards to send to frontend:\n{:#?}", cards);
 
     Ok(cards)
 }

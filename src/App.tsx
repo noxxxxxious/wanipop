@@ -11,6 +11,7 @@ import { AnswerField, InputMode } from "./components/AnswerField"
 import { ResultsDisplay } from "./components/ResultsDisplay"
 
 function App() {
+  const currentlyFetchingReviews = useRef(false)
   const reviewCards = useRef({} as Record<number, ReviewCard>)
   const [reviewStack, setReviewStack] = useState([] as ReviewTask[])
   const currentItem = useRef(null as ReviewTask | null)
@@ -42,47 +43,52 @@ function App() {
   }, [])
 
   const startSession = useCallback(() => {
-    //Reset everything
-    setFinishedStudy(false)
-    resultRecord.current = {}
-    currentItem.current = null
-    reviewCards.current = {}
-    setPlaceholderText('')
-    setPreviousAnswerCheck(undefined)
-    setReviewStack([])
-    setStudyResults([])
+    //If we aren't already fetching a new set of reviews
+    if(!currentlyFetchingReviews.current) {
+      currentlyFetchingReviews.current = true
+      //Reset everything
+      setFinishedStudy(false)
+      resultRecord.current = {}
+      currentItem.current = null
+      reviewCards.current = {}
+      setPlaceholderText('')
+      setPreviousAnswerCheck(undefined)
+      setReviewStack([])
+      setStudyResults([])
+      ;(async () => {
+        const batch = await invoke('get_review_batch') as ReviewCard[]
+        console.log('Fetching reviews...')
 
-    ;(async () => {
-      const batch = await invoke('get_review_batch') as ReviewCard[]
-      console.log('Fetching reviews...')
+        batch.forEach(reviewItem => {
+          reviewCards.current[reviewItem.subject_id] = reviewItem
 
-      batch.forEach(reviewItem => {
-        reviewCards.current[reviewItem.subject_id] = reviewItem
+          switch(reviewItem.subject_type) {
+            case 'radical':
+            case 'kana_vocabulary':
+              const newTask: ReviewTask = {
+                review_type: 'meaning',
+                review_item: reviewItem
+              }
+              setReviewStack(stack => [...stack, newTask])
+              break;
+            case 'kanji':
+            case 'vocabulary':
+              const newMeaningTask: ReviewTask = {
+                review_type: 'meaning',
+                review_item: reviewItem
+              }
+              const newReadingTask: ReviewTask = {
+                review_type: 'reading',
+                review_item: reviewItem
+              }
+              setReviewStack(stack => [...stack, newReadingTask, newMeaningTask])
+              break;
+          }
+        })
 
-        switch(reviewItem.subject_type) {
-          case 'radical':
-          case 'kana_vocabulary':
-            const newTask: ReviewTask = {
-              review_type: 'meaning',
-              review_item: reviewItem
-            }
-            setReviewStack(stack => [...stack, newTask])
-            break;
-          case 'kanji':
-          case 'vocabulary':
-            const newMeaningTask: ReviewTask = {
-              review_type: 'meaning',
-              review_item: reviewItem
-            }
-            const newReadingTask: ReviewTask = {
-              review_type: 'reading',
-              review_item: reviewItem
-            }
-            setReviewStack(stack => [...stack, newReadingTask, newMeaningTask])
-            break;
-        }
-      })
-    })()
+        currentlyFetchingReviews.current = false
+      })()
+    }
   }, [ reviewStack, placeholderText, previousAnswerCheck, finishedStudy, studyResults ])
 
   useEffect(() => {

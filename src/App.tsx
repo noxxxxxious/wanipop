@@ -134,7 +134,6 @@ function App() {
 
   function flipAnswer() {
     console.info('flipping answer')
-    debugger
 
     if(!currentItem.current) throw new Error('Trying to check answer but currentItem is undefined???')
     if(!currentItem.current.review_item) return

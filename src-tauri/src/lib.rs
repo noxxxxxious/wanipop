@@ -59,7 +59,7 @@ pub fn run() {
 
             //Set up timer to pop up after interval
             let minutes = config_copy.time_between_popups_in_minutes;
-            let interval = Duration::from_secs((minutes * 60) as u64);
+            let interval = Duration::from_secs((minutes * 3) as u64);
 
             let app_handle: AppHandle = app.handle().clone();
             spawn(async move {

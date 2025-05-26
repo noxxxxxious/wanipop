@@ -3,7 +3,9 @@
     <div class="result-character">{{item.subject_data.characters}}</div>
     <div class="result-info">
       <span class="ending-level">{{endingLevel}}</span>
-      <span class="arrow">⇑</span>
+      <svg class="arrow" :class="levelUp ? 'up' : ''" view-box="0 0 20 20" height="20" width="20">
+        <path :d="levelUp ? mdiUpArrowThick : mdiDownArrowThick" />
+      </svg>
     </div>
   </div>
 </template>
@@ -61,6 +63,8 @@ function SRSLevelToText(level: SRSLevel): SRSLevelText {
   }
 }
 
+const mdiUpArrowThick = 'M14 20h-4v-9l-3.5 3.5l-2.42-2.42L12 4.16l7.92 7.92l-2.42 2.42L14 11z'
+const mdiDownArrowThick = 'M10 4h4v9l3.5-3.5l2.42 2.42L12 19.84l-7.92-7.92L6.5 9.5L10 13z'
 </script>
 
 <style scoped>
@@ -87,7 +91,19 @@ function SRSLevelToText(level: SRSLevel): SRSLevelText {
   align-items: center;
 }
 
+.ending-level {
+  display: flex;
+  align-items: center;
+  line-height: 10px;
+}
+
 .arrow {
-  color: v-bind(arrowColor);
+  fill: v-bind(arrowColor);
+  font-size: 1.5rem;
+  transform: translateY(-3px);
+}
+
+.arrow.up {
+  transform: translateY(-5px);
 }
 </style>

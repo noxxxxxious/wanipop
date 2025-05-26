@@ -312,7 +312,6 @@ const invertedLastAttempt = computed(() => {
     color: v-bind(successOrErrorColor);
     outline: none;
     box-shadow: v-bind(successOrErrorShadow);
-    alignment-baseline: text-after-edge !important;
   }
 
   .answer-input::placeholder {
@@ -337,6 +336,11 @@ const invertedLastAttempt = computed(() => {
   .reading:not(:last-child)::after {
     color: var(--text-color);
     content: "、";
+  }
+
+  input:focus-within {
+    box-shadow: 0px 2px 2px rgba(0,0,0,0.3),
+      inset 0px 0px 2px var(--text-color);
   }
 
   .kunyomi {

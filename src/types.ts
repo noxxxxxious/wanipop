@@ -78,3 +78,11 @@ export enum SRSLevelText {
   Enlightened = "Enlightened",
   Burned = "Burned"
 }
+
+export interface WanipopConfig {
+    num_of_reviews_per_batch: number,
+    time_between_popups_in_minutes: number,
+    wanikani_api_key: String | null,
+
+    hide_window_decorations: boolean,
+}

@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "wanipop",
+  "productName": "WaniPOP!",
   "version": "0.1.0",
   "identifier": "com.wanipop.app",
   "build": {
@@ -12,9 +12,9 @@
   "app": {
     "windows": [
       {
-        "title": "wanipop",
-        "width": 1000,
-        "height": 1000
+        "title": "WaniPOP!",
+        "width": 600,
+        "height": 450
       }
     ],
     "security": {

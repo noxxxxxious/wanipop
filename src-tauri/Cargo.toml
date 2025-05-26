@@ -1,8 +1,8 @@
 [package]
-name = "wanipop"
+name = "WaniPOP"
 version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
+description = "An application that sits in your system tray and pops up on occasion, bugging you to do a few WaniKani reviews."
+authors = ["noxxxxxious"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

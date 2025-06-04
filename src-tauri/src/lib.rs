@@ -6,6 +6,7 @@ use std::sync::{Arc, Mutex};
 use reqwest::Client;
 use config::WanipopConfig;
 use commands::*;
+use serde::Serialize;
 
 use std::time::Duration;
 use tokio::time::sleep;
@@ -16,6 +17,11 @@ use tauri::{
 pub struct AppState {
     pub http_client: Client,
     pub config: Arc<Mutex<WanipopConfig>>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ReviewPayload {
+    pub payload: Vec<ReviewCard>
 }
 
 pub fn run() {
@@ -35,6 +41,8 @@ pub fn run() {
             }
         })
         .setup(move |app| {
+            use tauri_plugin_notification::NotificationExt;
+
             //Set window decorations
             let win = app.get_webview_window("main").unwrap();
             let _ = win.set_decorations(!config_copy.hide_window_decorations);
@@ -67,13 +75,33 @@ pub fn run() {
                     // wait
                     sleep(interval).await;
 
-                    // Reopen window and reinitialize if it's not already open
-                    if let Some(win) = app_handle.get_webview_window("main"){
-                        if let Ok(is_visible) = win.is_visible()  {
-                            if !is_visible {
-                                let _ = win.show();
-                                let _ = win.set_focus();
-                                let _ = app_handle.emit("reset-session", ());
+                    let reviews = get_review_batch(app_handle.state::<AppState>()).await;
+
+                    println!("Reviews: {:#?}", reviews);
+
+                    match reviews {
+                        Err(err) => {
+                            if err == "No reviews available right now".to_string() {
+                                let noti = app_handle.notification()
+                                    .builder()
+                                    .title("WaniPOP!")
+                                    .body("Just checked, and you're all caught up on reviews! 🥳\nGreat job staying on top of things! 🎉")
+                                    .show();
+                                println!("Notification: {:#?}", noti);
+                            }
+                            eprintln!("Error fetching reviews: {}", err);
+                            continue;
+                        }
+                        Ok(reviews) => {
+                            // Reopen window and reinitialize if it's not already open
+                            if let Some(win) = app_handle.get_webview_window("main"){
+                                if let Ok(is_visible) = win.is_visible()  {
+                                    if !is_visible {
+                                        let _ = win.show();
+                                        let _ = win.set_focus();
+                                        let _ = app_handle.emit("reset-session", ReviewPayload { payload: reviews  });
+                                    }
+                                }
                             }
                         }
                     }
@@ -83,6 +111,7 @@ pub fn run() {
             Ok(())
         })
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_notification::init())
         .manage(state)
         .invoke_handler(tauri::generate_handler![
             // Config

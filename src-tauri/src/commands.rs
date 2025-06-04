@@ -1,11 +1,11 @@
-use futures::future::join_all;
-use tauri::State;
-use crate::AppState;
 use crate::config::WanipopConfig;
 use crate::wanikani::{self, ReviewResult, SubmittedReviewData};
+use crate::AppState;
+use futures::future::join_all;
 use serde::Serialize;
+use tauri::State;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ReviewCard {
     pub assignment_id: u64,
     pub subject_id: u64,
@@ -64,10 +64,12 @@ pub fn set_hide_window_decorations(
 
 #[tauri::command]
 pub async fn get_wanikani_user(state: State<'_, AppState>) -> Result<String, String> {
-
-    let api_key =  get_api_key(&state)?;
+    let api_key = get_api_key(&state)?;
     match wanikani::fetch_user(&state.http_client, api_key).await {
-        Ok(user_data) => Ok(format!("User: {}, Level: {}", user_data.username, user_data.level)),
+        Ok(user_data) => Ok(format!(
+            "User: {}, Level: {}",
+            user_data.username, user_data.level
+        )),
         Err(e) => Err(format!("Failed to fetch user: {}", e)),
     }
 }
@@ -76,7 +78,7 @@ pub async fn get_wanikani_user(state: State<'_, AppState>) -> Result<String, Str
 
 #[tauri::command]
 pub async fn check_for_reviews(state: State<'_, AppState>) -> Result<bool, String> {
-    let api_key =  get_api_key(&state)?;
+    let api_key = get_api_key(&state)?;
     let summary = wanikani::fetch_summary(&state.http_client, api_key)
         .await
         .map_err(|e| format!("API error: {}", e))?;
@@ -102,12 +104,10 @@ pub async fn submit_wanikani_review(
 
 fn get_api_key(state: &State<'_, AppState>) -> Result<String, String> {
     let config = state.config.lock().unwrap();
-    let key = config
-        .wanikani_api_key
-        .clone();
+    let key = config.wanikani_api_key.clone();
     match key {
         Some(key) => Ok(key),
-        None => Err(format!("No api key set"))
+        None => Err(format!("No api key set")),
     }
 }
 
@@ -117,10 +117,7 @@ pub async fn get_review_batch(state: State<'_, AppState>) -> Result<Vec<ReviewCa
     let client = state.http_client.clone();
     let (api_key, batch_size) = {
         let cfg = state.config.lock().unwrap();
-        let key = cfg
-            .wanikani_api_key
-            .clone()
-            .ok_or("API key not set")?;
+        let key = cfg.wanikani_api_key.clone().ok_or("API key not set")?;
         (key, cfg.num_of_reviews_per_batch)
     };
     drop(state);
@@ -188,15 +185,15 @@ pub async fn get_review_batch(state: State<'_, AppState>) -> Result<Vec<ReviewCa
 }
 
 #[tauri::command]
-pub async fn submit_review_batch(state: State<'_, AppState>, payload: Vec<ReviewResult>) -> Result<Vec<SubmittedReviewData>, String> {
+pub async fn submit_review_batch(
+    state: State<'_, AppState>,
+    payload: Vec<ReviewResult>,
+) -> Result<Vec<SubmittedReviewData>, String> {
     // grab config
     let client = state.http_client.clone();
     let (api_key, batch_size) = {
         let cfg = state.config.lock().unwrap();
-        let key = cfg
-            .wanikani_api_key
-            .clone()
-            .ok_or("API key not set")?;
+        let key = cfg.wanikani_api_key.clone().ok_or("API key not set")?;
         (key, cfg.num_of_reviews_per_batch)
     };
     drop(state);
@@ -223,8 +220,7 @@ pub async fn submit_review_batch(state: State<'_, AppState>, payload: Vec<Review
     let results: Vec<Result<SubmittedReviewData, String>> = join_all(tasks).await;
 
     // partition successes and failures
-    let (oks, errs): (Vec<_>, Vec<_>) =
-        results.into_iter().partition(Result::is_ok);
+    let (oks, errs): (Vec<_>, Vec<_>) = results.into_iter().partition(Result::is_ok);
 
     let oks: Vec<SubmittedReviewData> = oks.into_iter().map(Result::unwrap).collect();
     let errs: Vec<String> = errs.into_iter().map(Result::unwrap_err).collect();

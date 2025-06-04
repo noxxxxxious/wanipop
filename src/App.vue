@@ -10,6 +10,10 @@
       <div v-if="showSettings">
         <SettingsView @on-close="onSettingsClose" />
       </div>
+      <div v-if="noReviewsRightNow">
+        🥳 Still caught up on reviews! 🥳<br>
+        This window will automatically close in a few seconds.
+      </div>
       <div v-else-if="noWaniKaniApiKey">
         Please input your API key in the settings.
       </div>
@@ -33,6 +37,7 @@
 import { onMounted, ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event';
+import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { ResultDisplay, ReviewCard, ReviewTask, SubmittedReviewData, WanipopConfig } from './types'
 
 import SettingsView from './components/SettingsView.vue';
@@ -47,6 +52,7 @@ const finishedStudySession = ref(false)
 const fetchingResults = ref(false)
 const showSettings = ref(false)
 const noWaniKaniApiKey = ref(true)
+const noReviewsRightNow = ref(false)
 
 onMounted(async () => {
   const { wanikani_api_key } = await invoke('get_config') as WanipopConfig
@@ -58,10 +64,10 @@ onMounted(async () => {
     startSession()
   }
 
-  listen('reset-session', () => startSession())
+  listen('reset-session', (batch) => startSession(batch))
 })
 
-async function startSession() {
+async function startSession(batch: any = []) { //It's actually ReviewCard[]
   const { wanikani_api_key } = await invoke('get_config') as WanipopConfig
 
   if(!wanikani_api_key) {
@@ -72,15 +78,28 @@ async function startSession() {
   }
 
   studyStore.resetStore()
-  fetchingReviews.value = true
   finishedStudySession.value = false
-  const batch = await invoke('get_review_batch') as ReviewCard[]
-  console.log('Fetching reviews...')
+  if(batch.length <= 0) {
+    fetchingReviews.value = true
+    console.log('Fetching reviews...')
+    try {
+      batch = await invoke('get_review_batch') as ReviewCard[]
+    } catch (error) {
+      console.info('GOTTA ERROR: ', error)
+    }
+  }
+
+  if(batch.length <= 0) {
+    noReviewsRightNow.value = true
+    fetchingReviews.value = false
+    automaticallyCloseWindow()
+    return
+  }
 
   const reviewItems = {} as Record<number, ReviewCard>
   const reviewStack = [] as ReviewTask[]
 
-  batch.forEach(reviewItem => {
+  batch.forEach((reviewItem: ReviewCard) => {
     reviewItems[reviewItem.subject_id] = reviewItem
 
     switch(reviewItem.subject_type) {
@@ -109,6 +128,13 @@ async function startSession() {
   studyStore.setReviewItems(reviewItems)
   studyStore.setReviewStack(reviewStack)
   fetchingReviews.value = false
+}
+
+function automaticallyCloseWindow() {
+  const window = getCurrentWebviewWindow()
+  setTimeout(() => {
+    window.close()
+  }, 5000)
 }
 
 function onSettingsClose(settingsChanged: boolean) {

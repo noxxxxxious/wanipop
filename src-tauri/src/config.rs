@@ -1,6 +1,6 @@
-use std::{fs, path::PathBuf};
+use serde::{Deserialize, Serialize};
 use std::io::{self, Write};
-use serde::{Serialize, Deserialize};
+use std::{fs, path::PathBuf};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct WanipopConfig {
@@ -24,11 +24,11 @@ impl WanipopConfig {
         wanikani_api_key: Option<String>,
         hide_window_decorations: bool,
     ) -> WanipopConfig {
-        WanipopConfig { 
-            num_of_reviews_per_batch, 
+        WanipopConfig {
+            num_of_reviews_per_batch,
             time_between_popups_in_minutes,
             wanikani_api_key,
-            hide_window_decorations
+            hide_window_decorations,
         }
     }
 
@@ -69,17 +69,26 @@ impl WanipopConfig {
         self.save()
     }
 
-    pub fn set_num_of_reviews_per_batch(&mut self, new_num_of_reviews_per_batch: usize) -> io::Result<()> {
+    pub fn set_num_of_reviews_per_batch(
+        &mut self,
+        new_num_of_reviews_per_batch: usize,
+    ) -> io::Result<()> {
         self.num_of_reviews_per_batch = new_num_of_reviews_per_batch;
         self.save()
     }
 
-    pub fn set_time_between_popups_in_minutes(&mut self, new_time_between_popups_in_minutes: usize) -> io::Result<()> {
+    pub fn set_time_between_popups_in_minutes(
+        &mut self,
+        new_time_between_popups_in_minutes: usize,
+    ) -> io::Result<()> {
         self.time_between_popups_in_minutes = new_time_between_popups_in_minutes;
         self.save()
     }
 
-    pub fn set_hide_window_decorations(&mut self, new_hide_window_decorations: bool) -> io::Result<()> {
+    pub fn set_hide_window_decorations(
+        &mut self,
+        new_hide_window_decorations: bool,
+    ) -> io::Result<()> {
         self.hide_window_decorations = new_hide_window_decorations;
         self.save()
     }

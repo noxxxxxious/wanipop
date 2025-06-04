@@ -1,6 +1,6 @@
-use reqwest::{Client, RequestBuilder};
-use serde::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};
+use reqwest::{Client, RequestBuilder};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize)]
 pub struct Assignment {
@@ -157,8 +157,7 @@ trait WaniClient {
 
 impl WaniClient for RequestBuilder {
     fn wanikani_headers(self, api_key: String) -> RequestBuilder {
-        self
-            .header("Authorization", format!("Bearer {}", api_key))
+        self.header("Authorization", format!("Bearer {}", api_key))
             .header("Wanikani-Revision", "20170710")
     }
 }
@@ -177,7 +176,10 @@ pub async fn fetch_user(client: &Client, api_key: String) -> Result<UserData, re
     Ok(user_data)
 }
 
-pub async fn fetch_summary(client: &Client, api_key: String) -> Result<SummaryData, reqwest::Error> {
+pub async fn fetch_summary(
+    client: &Client,
+    api_key: String,
+) -> Result<SummaryData, reqwest::Error> {
     let response = client
         .get("https://api.wanikani.com/v2/summary")
         .wanikani_headers(api_key)
@@ -192,7 +194,10 @@ pub async fn fetch_summary(client: &Client, api_key: String) -> Result<SummaryDa
 
 pub fn has_available_reviews(summary: &SummaryData) -> bool {
     let now = Utc::now();
-    summary.reviews.iter().any(|bucket| bucket.available_at <= now && !bucket.subject_ids.is_empty())
+    summary
+        .reviews
+        .iter()
+        .any(|bucket| bucket.available_at <= now && !bucket.subject_ids.is_empty())
 }
 
 pub async fn fetch_assignments_for_subjects(
@@ -206,7 +211,10 @@ pub async fn fetch_assignments_for_subjects(
         .collect::<Vec<_>>()
         .join(",");
 
-    let url = format!("https://api.wanikani.com/v2/assignments?subject_ids={}", ids);
+    let url = format!(
+        "https://api.wanikani.com/v2/assignments?subject_ids={}",
+        ids
+    );
 
     let res = client
         .get(&url)
@@ -247,8 +255,7 @@ pub async fn fetch_subjects(
 
     // now try to deserialize:
     let wrapper: CollectionResponse<Subject> =
-        serde_json::from_str(&txt)
-            .map_err(|e| format!("Serde error: {}", e))?;
+        serde_json::from_str(&txt).map_err(|e| format!("Serde error: {}", e))?;
 
     Ok(wrapper.data)
 }
@@ -273,4 +280,3 @@ pub async fn submit_review(
 
     Ok(res)
 }
-

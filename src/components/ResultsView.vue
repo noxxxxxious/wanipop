@@ -19,7 +19,7 @@ const studyStore = useStudyStore()
   flex-wrap: wrap;
   margin: auto;
   margin-top: 10px;
-  width: 600px;
+  width: 100%;
   gap: 1rem;
   justify-content: center;
 }

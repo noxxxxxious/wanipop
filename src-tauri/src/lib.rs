@@ -75,31 +75,44 @@ pub fn run() {
                     // wait
                     sleep(interval).await;
 
-                    let reviews = get_review_batch(app_handle.state::<AppState>()).await;
-
-                    println!("Reviews: {:#?}", reviews);
-
-                    match reviews {
-                        Err(err) => {
-                            if err == "No reviews available right now".to_string() {
-                                let noti = app_handle.notification()
-                                    .builder()
-                                    .title("WaniPOP!")
-                                    .body("Just checked, and you're all caught up on reviews! 🥳\nGreat job staying on top of things! 🎉")
-                                    .show();
-                                println!("Notification: {:#?}", noti);
+                    //Check if window is still open before seeing if reviews are available
+                    if let Some(win) = app_handle.get_webview_window("main") {
+                        if let Ok(is_visible) = win.is_visible() {
+                            if is_visible {
+                                println!("Window is still open. Doing nothing.");
+                                continue;
                             }
-                            eprintln!("Error fetching reviews: {}", err);
-                            continue;
-                        }
-                        Ok(reviews) => {
-                            // Reopen window and reinitialize if it's not already open
-                            if let Some(win) = app_handle.get_webview_window("main"){
-                                if let Ok(is_visible) = win.is_visible()  {
-                                    if !is_visible {
+
+                            let reviews = get_review_batch(app_handle.state::<AppState>()).await;
+                            println!("Reviews: {:#?}", reviews);
+
+                            match reviews {
+                                Err(err) => {
+                                    if err == "No reviews available right now".to_string() {
+                                        let noti = app_handle.notification()
+                                            .builder()
+                                            .title("WaniPOP!")
+                                            .body("Just checked, and you're all caught up on reviews! 🥳\nGreat job staying on top of things! 🎉")
+                                            .show();
+                                        println!("Notification: {:#?}", noti);
+                                    }
+                                    eprintln!("Error fetching reviews: {}", err);
+                                    continue;
+                                }
+                                Ok(reviews) => {
+                                    if reviews.len() > 0 {
+                                        // Reopen window and reinitialize if it's not already open
                                         let _ = win.show();
                                         let _ = win.set_focus();
-                                        let _ = app_handle.emit("reset-session", ReviewPayload { payload: reviews  });
+                                        let _ = app_handle.emit("reset-session", reviews);
+                                    } else {
+                                        let noti = app_handle.notification()
+                                            .builder()
+                                            .title("WaniPOP!")
+                                            .body("Just checked, and you're all caught up on reviews! 🥳\nGreat job staying on top of things! 🎉")
+                                            .show();
+                                        println!("Notification: {:#?}", noti);
+                                        println!("No reviews available right now");
                                     }
                                 }
                             }

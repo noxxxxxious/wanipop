@@ -14,11 +14,18 @@
         🥳 Still caught up on reviews! 🥳<br>
         This window will automatically close in a few seconds.
       </div>
+      <div v-else-if="showApiError">
+        Error getting review items:<br>
+        {{ apiError }}
+      </div>
       <div v-else-if="noWaniKaniApiKey">
         Please input your API key in the settings.
       </div>
       <div v-else-if="fetchingReviews && !finishedStudySession">
         Loading review items...
+      </div>
+      <div v-else-if="finishedStudySession &&!sentStudySessionToWaniKani">
+        <SubmissionView @on-submit="getResults" />
       </div>
       <div v-else-if="finishedStudySession && fetchingResults">
         Submitting results to WaniKani...
@@ -28,7 +35,7 @@
         Close the window when you're done!
         <ResultsView />
       </div>
-      <QuizView @completed-study="getResults" v-else />
+      <QuizView @completed-study="() => { finishedStudySession = true }" v-else />
     </section>
   </main>
 </template>
@@ -36,23 +43,27 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
-import { listen } from '@tauri-apps/api/event';
+import { listen, type Event } from '@tauri-apps/api/event';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { ResultDisplay, ReviewCard, ReviewTask, SubmittedReviewData, WanipopConfig } from './types'
 
 import SettingsView from './components/SettingsView.vue';
 import ResultsView from './components/ResultsView.vue';
 import QuizView from './components/QuizView.vue';
+import SubmissionView from './components/SubmissionView.vue';
 
 import { useStudyStore } from './stores/study';
 const studyStore = useStudyStore()
 
 const fetchingReviews = ref(false)
 const finishedStudySession = ref(false)
+const sentStudySessionToWaniKani = ref(false)
 const fetchingResults = ref(false)
 const showSettings = ref(false)
 const noWaniKaniApiKey = ref(true)
 const noReviewsRightNow = ref(false)
+const showApiError = ref(false)
+const apiError = ref('')
 
 onMounted(async () => {
   const { wanikani_api_key } = await invoke('get_config') as WanipopConfig
@@ -67,8 +78,22 @@ onMounted(async () => {
   listen('reset-session', (batch) => startSession(batch))
 })
 
-async function startSession(batch: any = []) { //It's actually ReviewCard[]
+interface TauriEvent {
+  event: string,
+  id: number,
+  payload: any
+}
+
+interface TauriEventStartSession extends TauriEvent {
+  payload: ReviewCard[]
+}
+
+//TODO: Fix this any
+async function startSession(batch: any | undefined = undefined) { //It's actually ReviewCard[]
   const { wanikani_api_key } = await invoke('get_config') as WanipopConfig
+
+  console.info('Starting session with the following batch:')
+  console.dir(batch)
 
   if(!wanikani_api_key) {
     showSettings.value = true
@@ -79,20 +104,38 @@ async function startSession(batch: any = []) { //It's actually ReviewCard[]
 
   studyStore.resetStore()
   finishedStudySession.value = false
-  if(batch.length <= 0) {
+  showApiError.value = false
+  sentStudySessionToWaniKani.value = false
+  if(!batch) {
     fetchingReviews.value = true
     console.log('Fetching reviews...')
     try {
       batch = await invoke('get_review_batch') as ReviewCard[]
     } catch (error) {
+      if(error == "No reviews available right now") {
+        console.log('No reviews! Closing window...')
+        noReviewsRightNow.value = true
+        fetchingReviews.value = false
+        automaticallyCloseWindow(5)
+        return
+      }
       console.info('GOTTA ERROR: ', error)
+      showApiError.value = true
+      apiError.value = error as string
+      fetchingReviews.value = false
+      automaticallyCloseWindow(10)
+      return
     }
+  } else {
+    batch = batch.payload
   }
 
+  console.log('Checking batch: ', batch)
   if(batch.length <= 0) {
+    console.log('No reviews! Closing window...')
     noReviewsRightNow.value = true
     fetchingReviews.value = false
-    automaticallyCloseWindow()
+    automaticallyCloseWindow(5)
     return
   }
 
@@ -130,11 +173,11 @@ async function startSession(batch: any = []) { //It's actually ReviewCard[]
   fetchingReviews.value = false
 }
 
-function automaticallyCloseWindow() {
+function automaticallyCloseWindow(timeOutInSeconds: number) {
   const window = getCurrentWebviewWindow()
   setTimeout(() => {
     window.close()
-  }, 5000)
+  }, timeOutInSeconds * 1000)
 }
 
 function onSettingsClose(settingsChanged: boolean) {
@@ -146,7 +189,7 @@ function onSettingsClose(settingsChanged: boolean) {
 
 async function getResults() {
   fetchingResults.value = true
-  finishedStudySession.value = true
+  sentStudySessionToWaniKani.value = true
   const payload = studyStore.getSubmittableResults()
   console.info('Submitting the following results: ', payload)
   const response = await invoke("submit_review_batch", { payload }) as SubmittedReviewData[]
@@ -447,7 +490,7 @@ body[data-theme='catppuccin-mocha'] {
   --vocabulary:      #A6DA95;
   --kana_vocabulary: #8BD5CA;
 
-  --apprentice:      #ED8796;
+  --apprentice:      #EED49f;
   --guru:            #8AADF4;
   --master:          #8BD5CA;
   --enlightened:     #A6DA95;

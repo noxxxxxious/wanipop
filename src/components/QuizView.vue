@@ -142,6 +142,10 @@ function checkAnswer() {
   }
 
   if(lastAttempt.value) {
+    if(lastAttempt.value == 'incorrect') {
+      //If incorrect, place at beginning of review stack so it gets reviewed again
+      studyStore.reviewStackUnshift(reviewItem.value)
+    }
     lastAttempt.value = undefined
     userInput.value = ''
     studyStore.reviewStackPop()
@@ -181,7 +185,7 @@ function checkAnswer() {
 
   if(correct) lastAttempt.value = 'correct'
   else        lastAttempt.value = 'incorrect'
-  studyStore.resultRecordMark(reviewItem.value, correct)
+  studyStore.resultRecordMark(reviewItem.value, correct, answerAttempt)
 
   // Fix visual bug of last kana getting changed back to romaji
   if(userInput.value.charAt(userInput.value.length - 1) == 'n'

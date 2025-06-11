@@ -35,6 +35,9 @@ export interface ReviewResult {
   characters: String | undefined,
   meaning: 'correct' | 'incorrect' | undefined,
   reading?: 'correct' | 'incorrect' | undefined,
+  meaning_attempt: string,
+  reading_attempt: string,
+  subjectData: ReviewCard,
 }
 
 export interface WaniKaniResult {

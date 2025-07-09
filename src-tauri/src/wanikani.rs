@@ -56,7 +56,7 @@ struct ReviewPayload {
     pub review: ReviewResult,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct ReviewResult {
     pub assignment_id: u64,
     pub incorrect_meaning_answers: u8,
@@ -94,6 +94,13 @@ pub struct SubjectData {
     pub reading_mnemonic: Option<String>,
 }
 
+#[derive(Debug,Serialize,Deserialize)]
+#[serde(tag = "type", content = "data", rename_all = "lowercase")]
+pub enum SubmittedReviewDataResult {
+    Success(SubmittedReviewData),
+    Failure(FailedSubmittedReviewData),
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SubmittedReviewData {
     pub created_at: DateTime<Utc>,
@@ -103,6 +110,12 @@ pub struct SubmittedReviewData {
     pub ending_srs_stage: u8,
     pub incorrect_meaning_answers: u8,
     pub incorrect_reading_answers: u8,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct FailedSubmittedReviewData {
+    pub assignment_id: u64,
+    pub error: String,
 }
 
 #[derive(Debug, Deserialize)]

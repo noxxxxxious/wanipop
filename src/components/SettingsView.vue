@@ -103,7 +103,6 @@ let originalHideWindowDecorations = ref(false)
 const apiKeyIsVisible = ref(false)
 
 let settingsChanged = false
-let setFromConfig = false
 
 const apiKeyVisibleBackgroundHoverColor = computed(() => {
   return apiKeyIsVisible.value ? 'var(--success-color)' : 'var(--error-color)'
@@ -122,7 +121,6 @@ onMounted(async () => {
   timeBetweenPopupsInMinutes.value = originalTimeBetweenPopupsInMinutes.value
   hideWindowDecorations.value = originalHideWindowDecorations.value
 
-  setFromConfig = true
   console.log('Config loaded from file')
 })
 

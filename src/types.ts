@@ -29,6 +29,21 @@ export interface ReviewTask {
   review_item: ReviewCard,
 }
 
+export interface ReviewResponseSuccess {
+  type: "success",
+  data: SubmittedReviewData
+}
+
+export interface ReviewResponseFailure {
+  type: "failure",
+  data: {
+    assignment_id: number,
+    error: String,
+  }
+}
+
+export type ReviewResponse = ReviewResponseSuccess | ReviewResponseFailure
+
 export interface ReviewResult {
   assignment_id: number,
   subject_id: number,

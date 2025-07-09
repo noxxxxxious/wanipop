@@ -43,9 +43,9 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
-import { listen, type Event } from '@tauri-apps/api/event';
+import { listen } from '@tauri-apps/api/event';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
-import { ResultDisplay, ReviewCard, ReviewTask, SubmittedReviewData, WanipopConfig } from './types'
+import { ReviewCard, ReviewResponse, ReviewTask, WanipopConfig } from './types'
 
 import SettingsView from './components/SettingsView.vue';
 import ResultsView from './components/ResultsView.vue';
@@ -78,16 +78,6 @@ onMounted(async () => {
   listen('reset-session', (batch) => startSession(batch))
 })
 
-interface TauriEvent {
-  event: string,
-  id: number,
-  payload: any
-}
-
-interface TauriEventStartSession extends TauriEvent {
-  payload: ReviewCard[]
-}
-
 //TODO: Fix this any
 async function startSession(batch: any | undefined = undefined) { //It's actually ReviewCard[]
   const { wanikani_api_key } = await invoke('get_config') as WanipopConfig
@@ -106,6 +96,7 @@ async function startSession(batch: any | undefined = undefined) { //It's actuall
   finishedStudySession.value = false
   showApiError.value = false
   sentStudySessionToWaniKani.value = false
+  noReviewsRightNow.value = false
   if(!batch) {
     fetchingReviews.value = true
     console.log('Fetching reviews...')
@@ -192,18 +183,28 @@ async function getResults() {
   sentStudySessionToWaniKani.value = true
   const payload = studyStore.getSubmittableResults()
   console.info('Submitting the following results: ', payload)
-  const response = await invoke("submit_review_batch", { payload }) as SubmittedReviewData[]
+  const response = await invoke("submit_review_batch", { payload }) as ReviewResponse[]
   console.info('Received response from Wanikani: ', response)
-  const results: ResultDisplay[] = response.map(result => {
-    const subject_data = studyStore.reviewItems[result.subject_id]!
-    return {
-      subject_data,
-      ...result
-    }
-  })
-  console.info('Results:', results)
-  studyStore.setStudyResults(results)
+  studyStore.setStudyResults(response)
   fetchingResults.value = false
+
+  //If any failed to submit, resubmit
+  if(response.filter(r => r.type == 'failure').length > 0) {
+    setTimeout(fixFailedResultSubmissions, 10000)
+  }
+}
+
+async function fixFailedResultSubmissions() {
+  const payload = studyStore.getSubmittableResultsFromFailedSubmissions()
+  console.info('Resubmitting the following results: ', payload)
+  const response = await invoke("submit_review_batch", { payload }) as ReviewResponse[]
+  console.info('Received response from Wanikani: ', response)
+  studyStore.updateStudyResults(response)
+
+  //If any failed to submit, resubmit
+  if(response.filter(r => r.type == 'failure').length > 0) {
+    setTimeout(fixFailedResultSubmissions, 10000)
+  }
 }
 </script>
 

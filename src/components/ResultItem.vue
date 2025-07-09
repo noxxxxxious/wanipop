@@ -1,6 +1,6 @@
 <template>
   <div class="result-item">
-    <div class="result-character">{{item.subject_data.characters}}</div>
+    <div class="result-character">{{subjectData?.characters}}</div>
     <div class="result-info">
       <span class="ending-level">{{endingLevelText}}</span>
       <svg class="arrow" :class="levelUp ? 'up' : ''" view-box="0 0 20 20" height="20" width="20">
@@ -12,11 +12,14 @@
 
 <script setup lang="ts">
 import { computed } from "vue"
-import { ResultDisplay, SRSLevel, SRSLevelText, SubjectType } from "../types"
+import { useStudyStore } from "../stores/study";
+import { SRSLevel, SRSLevelText, SubjectType, SubmittedReviewData } from "../types"
 
 const { item } = defineProps<{
-  item: ResultDisplay
+  item: SubmittedReviewData
 }>()
+const studyStore = useStudyStore()
+
 
 const colors: Record<SubjectType, string> = {
   radical:         "var(--radical)", // Catppuccin Macchiato “Blue”
@@ -34,15 +37,21 @@ const levelColors: Record<Lowercase<SRSLevelText>, string> = {
   burned:          "var(--burned)",
 }
 
+const subjectData = computed(() => {
+  return Object.values(studyStore.resultRecord).find(r => r.assignment_id == item.assignment_id)
+})
 
 const levelUp = item.starting_srs_stage < item.ending_srs_stage
 const endingLevel   = SRSLevelToText(item.ending_srs_stage)
 const endingLevelText = SRSLevelToLeveledText(item.ending_srs_stage)
 
 const arrowColor = levelUp ? 'var(--success-color)' : 'var(--error-color)'
-const characterColor = computed(() => colors[item.subject_data.subject_type])
 const containerBorder = computed(() => `3px solid ${levelColors[endingLevel.toLowerCase() as Lowercase<SRSLevelText>]}`)
 const containerBoxShadow = computed(() => `inset 0px 0px 10px ${levelColors[endingLevel.toLowerCase() as Lowercase<SRSLevelText>]}`)
+const characterColor = computed(() => {
+  if(!subjectData.value) return ""
+  return colors[subjectData.value.subjectData.subject_type]
+})
 
 function SRSLevelToText(level: SRSLevel): SRSLevelText {
   switch(level){

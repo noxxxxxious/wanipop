@@ -1,12 +1,12 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { ResultDisplay, ReviewCard, ReviewResult, ReviewTask, WaniKaniResult } from '../types'
+import { ReviewCard, ReviewResponse, ReviewResult, ReviewTask, WaniKaniResult } from '../types'
 
 export const useStudyStore = defineStore('study', () => {
   let storeReviewItems  = ref({} as Record<number, ReviewCard>)
   let storeReviewStack  = ref([] as Array<ReviewTask>)
   let storeResultRecord = ref({} as Record<number, ReviewResult>)
-  let storeStudyResults = ref([] as Array<ResultDisplay>)
+  let storeStudyResults = ref([] as Array<ReviewResponse>)
 
   function resetStore() {
     console.info('Resetting studyStore')
@@ -24,7 +24,7 @@ export const useStudyStore = defineStore('study', () => {
   function setReviewItems  (reviewItems:  Record<number, ReviewCard>  ){ storeReviewItems.value   = reviewItems  }
   function setReviewStack  (reviewStack:  Array<ReviewTask>           ){ storeReviewStack.value   = reviewStack  }
   function setResultRecord (resultRecord: Record<number, ReviewResult>){ storeResultRecord.value  = resultRecord }
-  function setStudyResults (studyResults: Array<ResultDisplay>        ){ storeStudyResults.value  = studyResults }
+  function setStudyResults (studyResults: Array<ReviewResponse>        ){ storeStudyResults.value  = studyResults }
 
   function reviewStackPop() {
     storeReviewStack.value.pop()
@@ -138,6 +138,26 @@ export const useStudyStore = defineStore('study', () => {
     }))
   }
 
+  function getSubmittableResultsFromFailedSubmissions(): Array<WaniKaniResult> {
+    const failedSubmissionAssignmentIds = storeStudyResults.value.filter(r => r.type == 'failure').map(r => r.data.assignment_id)
+    const failedSubmissionItems = Object.values(storeResultRecord.value).filter(result => failedSubmissionAssignmentIds.includes(result.assignment_id))
+    return failedSubmissionItems.map(result => ({
+      assignment_id: result.assignment_id,
+      incorrect_reading_answers: result.reading == 'correct' ? 0 : 1,
+      incorrect_meaning_answers: result.meaning == 'correct' ? 0 : 1,
+    }))
+  }
+
+  function updateStudyResults(updatedResults: ReviewResponse[]) {
+    updatedResults.forEach(updatedResult => {
+      storeStudyResults.value.forEach((existingResult, index) => {
+        if(existingResult.data.assignment_id == updatedResult.data.assignment_id) {
+          storeStudyResults.value[index] = updatedResult
+        }
+      })
+    })
+  }
+
   return {
     resetStore,
 
@@ -157,7 +177,9 @@ export const useStudyStore = defineStore('study', () => {
 
     studyResults,
     setStudyResults,
+    updateStudyResults,
 
-    getSubmittableResults
+    getSubmittableResults,
+    getSubmittableResultsFromFailedSubmissions,
   }
 })

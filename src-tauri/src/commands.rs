@@ -1,5 +1,5 @@
 use crate::config::WanipopConfig;
-use crate::wanikani::{self, ReviewResult, SubmittedReviewData};
+use crate::wanikani::{self, FailedSubmittedReviewData, ReviewResult, SubmittedReviewData, SubmittedReviewDataResult};
 use crate::AppState;
 use futures::future::join_all;
 use serde::Serialize;
@@ -94,11 +94,21 @@ pub async fn submit_wanikani_review(
     let api_key = get_api_key(&state)?;
 
     match wanikani::submit_review(&state.http_client, api_key, input).await {
-        Ok(res) => Ok(format!(
+        Ok(res) => {
+            println!("{}", format!(
+                "Submitted review. SRS went from {} → {}",
+                res.data.starting_srs_stage, res.data.ending_srs_stage
+            ));
+            Ok(format!(
             "Submitted review. SRS went from {} → {}",
             res.data.starting_srs_stage, res.data.ending_srs_stage
-        )),
-        Err(e) => Err(format!("Failed to submit review: {}", e)),
+            ))
+        }
+        ,
+        Err(e) => {
+            println!("{}", format!("Failed to submit review: {}", e));
+            Err(format!("Failed to submit review: {}", e))
+        },
     }
 }
 
@@ -144,20 +154,20 @@ pub async fn get_review_batch(state: State<'_, AppState>) -> Result<Vec<ReviewCa
         ids.truncate(batch_size);
     }
 
-    println!("Randomly chose these reviews to do:\n{:#?}", ids);
+    // println!("Randomly chose these reviews to do:\n{:#?}", ids);
 
     // 4. fetch assignments & subjects in one go
     let assignments = wanikani::fetch_assignments_for_subjects(&client, api_key.clone(), &ids)
         .await
         .map_err(|e| format!("Assignments error: {}", e))?;
 
-    println!("Fetched assignments:\n{:#?}", assignments);
+    // println!("Fetched assignments:\n{:#?}", assignments);
 
     let subjects = wanikani::fetch_subjects(&client, api_key.clone(), &ids)
         .await
         .map_err(|e| format!("Subjects error: {}", e))?;
 
-    println!("Fetched subjects:\n{:#?}", assignments);
+    // println!("Fetched subjects:\n{:#?}", assignments);
 
     // 5. zip them into ReviewCard
     let cards = assignments
@@ -179,7 +189,7 @@ pub async fn get_review_batch(state: State<'_, AppState>) -> Result<Vec<ReviewCa
         })
         .collect();
 
-    println!("Cards to send to frontend:\n{:#?}", cards);
+    // println!("Cards to send to frontend:\n{:#?}", cards);
 
     Ok(cards)
 }
@@ -188,13 +198,12 @@ pub async fn get_review_batch(state: State<'_, AppState>) -> Result<Vec<ReviewCa
 pub async fn submit_review_batch(
     state: State<'_, AppState>,
     payload: Vec<ReviewResult>,
-) -> Result<Vec<SubmittedReviewData>, String> {
+) -> Result<Vec<SubmittedReviewDataResult>, String> {
     // grab config
     let client = state.http_client.clone();
-    let (api_key, batch_size) = {
+    let api_key = {
         let cfg = state.config.lock().unwrap();
-        let key = cfg.wanikani_api_key.clone().ok_or("API key not set")?;
-        (key, cfg.num_of_reviews_per_batch)
+        cfg.wanikani_api_key.clone().ok_or("API key not set")?
     };
     drop(state);
 
@@ -202,32 +211,33 @@ pub async fn submit_review_batch(
         let client = client.clone();
         let key = api_key.clone();
         async move {
-            let response = wanikani::submit_review(&client, key, item)
-                .await
-                .map_err(|e| e.to_string())?;
-            Ok(SubmittedReviewData {
-                created_at: response.data_updated_at,
-                assignment_id: response.data.assignment_id,
-                subject_id: response.data.subject_id,
-                starting_srs_stage: response.data.starting_srs_stage,
-                ending_srs_stage: response.data.ending_srs_stage,
-                incorrect_meaning_answers: response.data.incorrect_meaning_answers,
-                incorrect_reading_answers: response.data.incorrect_reading_answers,
-            })
+            match wanikani::submit_review(&client, key, item).await {
+                Ok(response) => SubmittedReviewDataResult::Success(SubmittedReviewData {
+                    created_at: response.data_updated_at,
+                    assignment_id: response.data.assignment_id,
+                    subject_id: response.data.subject_id,
+                    starting_srs_stage: response.data.starting_srs_stage,
+                    ending_srs_stage: response.data.ending_srs_stage,
+                    incorrect_meaning_answers: response.data.incorrect_meaning_answers,
+                    incorrect_reading_answers: response.data.incorrect_reading_answers,
+                }),
+                Err(e) => SubmittedReviewDataResult::Failure(FailedSubmittedReviewData {
+                    assignment_id: item.assignment_id,
+                    error: e.to_string(),
+                }),
+            }
         }
     });
 
-    let results: Vec<Result<SubmittedReviewData, String>> = join_all(tasks).await;
+    let results: Vec<SubmittedReviewDataResult> = join_all(tasks).await;
 
-    // partition successes and failures
-    let (oks, errs): (Vec<_>, Vec<_>) = results.into_iter().partition(Result::is_ok);
+    // Check if there were any failures
+    let has_failures = results.iter().any(|r| matches!(r, SubmittedReviewDataResult::Failure(_)));
 
-    let oks: Vec<SubmittedReviewData> = oks.into_iter().map(Result::unwrap).collect();
-    let errs: Vec<String> = errs.into_iter().map(Result::unwrap_err).collect();
-
-    if !errs.is_empty() {
-        Err(format!("{} reviews failed: {:?}", errs.len(), errs))
-    } else {
-        Ok(oks)
+    if has_failures {
+        let failure_count = results.iter().filter(|r| matches!(r, SubmittedReviewDataResult::Failure(_))).count();
+        println!("{} reviews failed. Check individual results for details.", failure_count);
     }
+
+    Ok(results)
 }
